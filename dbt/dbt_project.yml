@@ -1,4 +1,4 @@
-name: dbt
+name: saas_analytics
 
 profile: saas_analytics
 
@@ -22,3 +22,5 @@ models:
       +materialized: view
     marts:
       +materialized: table
+flags:
+  require_generic_test_arguments_property: true
