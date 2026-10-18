@@ -1,0 +1,138 @@
+version: 2
+
+sources:
+  - name: raw_saas
+    description: >-
+      Raw tables for the SaaS subscription analytics project. SYNTHETIC data
+      produced by a seeded generator (generate_saas_data.py, seed 42), not
+      from a real company. Loaded into BigQuery by load_to_bq.py in daily
+      batches. Raw means untouched: every column is a STRING except
+      _batch_date (DATE), and nothing is deduplicated, filtered or corrected.
+      Cleaning happens in the staging models.
+    tables:
+      - name: customers
+        description: >-
+          One row per customer. A dump of the customers table as of the end of
+          the loaded day, replaced in full on every load, so it holds current
+          state only and no history. It is the source for the dbt snapshot.
+        columns:
+          - name: customer_id
+            data_type: string
+          - name: company_name
+            data_type: string
+          - name: country
+            data_type: string
+          - name: signup_date
+            data_type: string
+          - name: plan
+            data_type: string
+          - name: seats
+            data_type: string
+          - name: billing_interval
+            data_type: string
+          - name: status
+            data_type: string
+          - name: _batch_date
+            data_type: date
+            description: "Date of the dump. The same value on every row, because the table is replaced on each load."
+
+      - name: invoices
+        description: >-
+          One row per invoice issued. Append-only: each daily batch adds the
+          invoices issued that day. Records what was billed, not whether it was
+          paid.
+        columns:
+          - name: invoice_id
+            data_type: string
+          - name: customer_id
+            data_type: string
+          - name: issued_date
+            data_type: string
+          - name: plan
+            data_type: string
+          - name: seats
+            data_type: string
+          - name: billing_interval
+            data_type: string
+          - name: amount_cents
+            data_type: string
+          - name: currency
+            data_type: string
+          - name: _batch_date
+            data_type: date
+            description: "Date of the daily batch that delivered the row."
+
+      - name: payment_attempts
+        description: >-
+          One row per attempt to charge an invoice, including failed attempts
+          and retries. Append-only: each daily batch adds the attempts made
+          that day.
+        columns:
+          - name: attempt_id
+            data_type: string
+          - name: invoice_id
+            data_type: string
+          - name: customer_id
+            data_type: string
+          - name: attempted_at
+            data_type: string
+          - name: status
+            data_type: string
+          - name: failure_reason
+            data_type: string
+          - name: _batch_date
+            data_type: date
+            description: "Date of the daily batch that delivered the row."
+
+      - name: product_events
+        description: >-
+          One row per product usage event as delivered. Append-only, and
+          delivery is at least once, so known quirks are present: some event_ids
+          appear in more than one batch (duplicates), some events arrive 1 to 5
+          days after they happened (event_ts is earlier than _batch_date), and
+          about 0.1 percent reference a customer_id that does not exist in
+          customers. All are left as delivered and handled in staging.
+        columns:
+          - name: event_id
+            data_type: string
+          - name: customer_id
+            data_type: string
+          - name: user_id
+            data_type: string
+          - name: event_name
+            data_type: string
+          - name: event_ts
+            data_type: string
+            description: "Time the event happened. No time zone in the source."
+          - name: _batch_date
+            data_type: date
+            description: "Date of the daily batch that delivered the row. Later than the date of event_ts for late events."
+
+      - name: subscription_events
+        description: >-
+          One row per change to a customer's subscription (started,
+          plan_changed, seats_changed, canceled, reactivated). Append-only. Each
+          row carries the full state after the change. A few events are
+          delivered twice; the copy is left as delivered and removed in
+          staging.
+        columns:
+          - name: event_id
+            data_type: string
+          - name: customer_id
+            data_type: string
+          - name: event_type
+            data_type: string
+          - name: event_ts
+            data_type: string
+            description: "Time the change happened. No time zone in the source."
+          - name: plan
+            data_type: string
+          - name: seats
+            data_type: string
+          - name: billing_interval
+            data_type: string
+          - name: reason
+            data_type: string
+          - name: _batch_date
+            data_type: date
+            description: "Date of the daily batch that delivered the row."

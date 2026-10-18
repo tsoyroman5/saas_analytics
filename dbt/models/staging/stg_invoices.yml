@@ -1,0 +1,69 @@
+version: 2
+
+models:
+  - name: stg_invoices
+    description: >-
+      One row per invoice issued. An invoice is created when a subscription
+      starts, at every renewal (monthly or annual) and when a customer
+      reactivates. An invoice says what was billed, not whether it was paid:
+      payment outcomes are in stg_payment_attempts. Annual invoices cover 12
+      months, so amount_cents is not monthly recurring revenue and must not be
+      summed as MRR.
+    columns:
+      - name: invoice_id
+        data_type: string
+        description: "Unique identifier of the invoice (primary key)."
+        data_tests: ["not_null", "unique"]
+
+      - name: customer_id
+        data_type: string
+        description: "Customer being billed. References stg_customers."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: issued_date
+        data_type: date
+        description: "Date the invoice was issued."
+        data_tests: ["not_null"]
+
+      - name: plan
+        data_type: string
+        description: "Plan billed on this invoice (starter, pro or business), as it was at issue time."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["starter", "pro", "business"]
+
+      - name: seats
+        data_type: int64
+        description: "Number of seats billed, as it was at issue time."
+        data_tests: ["not_null"]
+
+      - name: billing_interval
+        data_type: string
+        description: "Period this invoice covers: monthly (1 month) or annual (12 months, 20 percent discount on the per-seat price)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["monthly", "annual"]
+
+      - name: amount_cents
+        data_type: int64
+        description: "Total billed in cents: seats times the per-seat monthly price for the plan and interval, times the months covered. For example 1200 means 12.00 in currency."
+        data_tests: ["not_null"]
+
+      - name: currency
+        data_type: string
+        description: "Currency of amount_cents. Always USD in this dataset."
+        data_tests: ["not_null"]
+
+      - name: _batch_date
+        data_type: date
+        description: "Date of the daily batch that delivered this invoice."
+        data_tests: ["not_null"]

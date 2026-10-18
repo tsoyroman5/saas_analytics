@@ -1,0 +1,80 @@
+version: 2
+
+models:
+  - name: stg_subscription_events
+    description: >-
+      One row per change to a customer's subscription: started, plan_changed,
+      seats_changed, canceled or reactivated. Every row carries the full state
+      (plan, seats, billing_interval) after the change, so the state at any
+      moment is the state of the latest event on or before it, ordered by
+      event_ts. This is the history source for MRR. The source can deliver an
+      event more than once; this model keeps one row per event_id, from the
+      earliest batch.
+    columns:
+      - name: event_id
+        data_type: string
+        description: "Unique identifier of the event (primary key after deduplication)."
+        data_tests: ["not_null", "unique"]
+
+      - name: customer_id
+        data_type: string
+        description: "Customer the subscription belongs to. References stg_customers."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: event_type
+        data_type: string
+        description: "What changed: started, plan_changed, seats_changed, canceled or reactivated."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  [
+                    "canceled",
+                    "plan_changed",
+                    "reactivated",
+                    "seats_changed",
+                    "started",
+                  ]
+
+      - name: event_ts
+        data_type: datetime
+        description: "When the change happened. No time zone in the source, stored as a DATETIME. Within one customer, event_ts order is the order the changes happened in."
+        data_tests: ["not_null"]
+
+      - name: plan
+        data_type: string
+        description: "Plan after the change (starter, pro or business). For canceled events, the plan held at cancellation."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['starter', 'pro', 'business']
+
+      - name: seats
+        data_type: int64
+        description: "Number of paid seats after the change. For canceled events, the seats held at cancellation."
+        data_tests: ["not_null"]
+
+      - name: billing_interval
+        data_type: string
+        description: "Billing interval after the change: monthly or annual."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['monthly', 'annual']
+
+      - name: reason
+        data_type: string
+        description: "Why the change happened. Filled only for plan_changed (upgrade or downgrade) and canceled (voluntary or payment_failed); empty otherwise."
+
+      - name: _batch_date
+        data_type: date
+        description: "Date of the earliest batch that delivered this event."
+        data_tests: ["not_null"]

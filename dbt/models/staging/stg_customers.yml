@@ -1,0 +1,67 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: >-
+      One row per customer, taken from the nightly customers dump. The dump is
+      a snapshot of current state that is replaced on every load, so this model
+      shows each customer as of the latest load and holds no history. Plan and
+      seat changes over time are tracked in the snapshot and in
+      stg_subscription_events. Synthetic data.
+    columns:
+      - name: customer_id
+        data_type: string
+        description: "Unique customer identifier, format cus_ followed by six digits (primary key)."
+        data_tests: ["not_null", "unique"]
+
+      - name: company_name
+        data_type: string
+        description: "Name of the customer company. Generated, not a real company."
+        data_tests: ["not_null"]
+
+      - name: country
+        data_type: string
+        description: "Two-letter ISO country code of the customer."
+        data_tests: ["not_null"]
+
+      - name: signup_date
+        data_type: date
+        description: "Date the customer first started a subscription. Not changed by cancellation or reactivation."
+        data_tests: ["not_null"]
+
+      - name: plan
+        data_type: string
+        description: "Current plan (starter, pro or business). For canceled customers, the plan held at cancellation."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['starter', 'pro', 'business']
+
+      - name: seats
+        data_type: int64
+        description: "Current number of paid seats. For canceled customers, the seats held at cancellation."
+        data_tests: ["not_null"]
+
+      - name: billing_interval
+        data_type: string
+        description: "How the customer is billed: monthly, or annual with a 20 percent discount. A reactivated customer returns on monthly billing."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['monthly', 'annual']
+
+      - name: status
+        data_type: string
+        description: "active or canceled. Canceled covers both voluntary cancellation and cancellation after repeated payment failure."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['active', 'canceled']
+
+      - name: _batch_date
+        data_type: date
+        description: "Date of the dump this row came from. Identical for every row, because the raw table is replaced on each load."
+        data_tests: ["not_null"]

@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: stg_payment_attempts
+    description: >-
+      One row per attempt to charge an invoice. An invoice can have several
+      attempts: if the first attempt fails, the charge is retried 3 days later,
+      and then 7 days after that failure. After the third failed attempt the
+      customer is canceled for non-payment. Attempts are not deduplicated
+      because the source does not repeat them.
+    columns:
+      - name: attempt_id
+        data_type: string
+        description: "Unique identifier of the payment attempt (primary key)."
+        data_tests: ["not_null", "unique"]
+
+      - name: invoice_id
+        data_type: string
+        description: "Invoice this attempt tries to collect. References stg_invoices."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_invoices')
+                field: invoice_id
+
+      - name: customer_id
+        data_type: string
+        description: "Customer being charged. References stg_customers."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: attempted_at
+        data_type: datetime
+        description: "When the attempt was made. The source gives no time zone, so the value is stored as a DATETIME without conversion."
+        data_tests: ["not_null"]
+
+      - name: status
+        data_type: string
+        description: "Outcome of the attempt: succeeded or failed."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['succeeded', 'failed']
+
+      - name: failure_reason
+        data_type: string
+        description: "Why the attempt failed (card_declined, insufficient_funds or expired_card). Empty when the attempt succeeded."
+
+      - name: _batch_date
+        data_type: date
+        description: "Date of the daily batch that delivered this row."
+        data_tests: ["not_null"]

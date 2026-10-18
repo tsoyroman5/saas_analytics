@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: stg_product_events
+    description: >-
+      One row per distinct product usage event. The source delivers events at
+      least once, so some event_ids arrive in more than one daily batch; this
+      model keeps the copy from the earliest batch. The copies are identical
+      apart from _batch_date, so the choice does not change any values. Events
+      can also arrive 1 to 5 days after they happened (event_ts is earlier than
+      _batch_date); late events are kept. A small share of events (about 0.1
+      percent) reference a customer_id that does not exist in stg_customers.
+      They are kept and reported by a warning test.
+    columns:
+      - name: event_id
+        data_type: string
+        description: "Unique identifier of the event (primary key after deduplication)."
+        data_tests: ["not_null", "unique"]
+
+      - name: customer_id
+        data_type: string
+        description: "Customer that produced the event. A few values do not exist in stg_customers (orphans); the relationships test only warns."
+        data_tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: user_id
+        data_type: string
+        description: "User within the customer's account who produced the event. Only meaningful together with customer_id."
+        data_tests: ["not_null"]
+
+      - name: event_name
+        data_type: string
+        description: "Type of usage event: login, dashboard_viewed, report_created, export or invite_sent."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  [
+                    "export",
+                    "report_created",
+                    "dashboard_viewed",
+                    "login",
+                    "invite_sent",
+                  ]
+
+      - name: event_ts
+        data_type: datetime
+        description: "When the event happened. The source gives no time zone, so the value is stored as a DATETIME without conversion."
+        data_tests: ["not_null"]
+
+      - name: _batch_date
+        data_type: date
+        description: "Date of the earliest batch that delivered this event. Later than the date of event_ts for late-arriving events."
+        data_tests: ["not_null"]
