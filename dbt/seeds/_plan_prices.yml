@@ -1,0 +1,40 @@
+version: 2
+
+seeds:
+  - name: plan_prices
+    description: >
+      List price per seat per month for every combination of plan and billing interval, in cents.
+      One row per plan and billing interval (six rows). Annual plans carry a price 20% below the monthly
+      price; the figure is already per month, so an annual plan's monthly MRR does not need to be divided
+      by 12 again. Synthetic reference data that mirrors the prices used by the data generator.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - plan
+              - billing_interval
+      
+    columns:
+      - name: plan
+        data_type: string
+        description: "Plan name: starter, pro or business. Together with `billing_interval` it identifies one price."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['starter', 'pro', 'business']
+
+      - name: billing_interval
+        data_type: string
+        description: "Billing interval: monthly or annual. Together with `plan` it identifies one price."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['monthly', 'annual']
+
+      - name: price_per_seat_month_cents
+        data_type: int64
+        description: "Price of one seat for one month, in cents. For annual plans this is the annual price divided by 12."
+        data_tests:
+          - not_null
