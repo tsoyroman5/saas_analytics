@@ -78,6 +78,7 @@ models:
         description: "Number of seats after the defining event. For a canceled customer, the seats before the cancellation."
         data_tests:
           - not_null
+          - is_non_negative
 
       - name: billing_interval
         data_type: string
@@ -103,6 +104,7 @@ models:
           of a canceled row is 0.        
         data_tests:
           - not_null
+          - is_non_negative
 
       - name: mrr_cents
         data_type: int64
@@ -112,3 +114,4 @@ models:
           gives the total MRR of the month.        
         data_tests:
           - not_null
+          - is_non_negative

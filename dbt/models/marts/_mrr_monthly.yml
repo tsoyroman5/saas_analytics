@@ -1,0 +1,96 @@
+version: 2
+
+models:
+  - name: mrr_monthly
+    description: >
+      Monthly recurring revenue (MRR) bridge, one row per calendar month: how total MRR moves from the end
+      of the previous month to the end of this one. Built by summing `int_customer_mrr_movements`.
+      Synthetic data (seed 42).
+
+      MRR is a month-end snapshot of subscriptions, not billed revenue. A customer's MRR is seats multiplied
+      by the price per seat for their plan and billing interval (annual plans use the discounted price,
+      already expressed per month), and 0 once they are canceled. Changes that start and end inside one
+      month do not appear.
+
+      The bridge identity holds in every row:
+      `starting_mrr + new_mrr + reactivation_mrr + expansion_mrr - contraction_mrr - churned_mrr = ending_mrr`.
+      `starting_mrr` is the previous month's `ending_mrr` (0 in the first month). All amounts are in cents,
+      and all movement columns are reported as positive numbers; contraction and churn are subtracted in the
+      identity.
+
+      Definitions: `new` is the first month in which a customer has MRR at a month end, so a customer who
+      starts and cancels inside one month and returns later counts as new on their return. `reactivation`
+      is a return of a customer who had MRR at an earlier month end. `expansion` and `contraction` are
+      increases and decreases of a customer who stays active. `churn` is a customer going from MRR above 0
+      to 0.
+    columns:
+      - name: month
+        data_type: date
+        description: "First day of the calendar month. All figures describe the month-end state and the movements of that month."
+        data_tests:
+          - not_null
+
+      - name: starting_mrr
+        data_type: int64
+        description: "Total MRR at the end of the previous month, in cents. Equals the previous row's `ending_mrr`; 0 in the first month."
+        data_tests:
+          - not_null
+
+      - name: new_mrr
+        data_type: int64
+        description: "MRR added by customers who have month-end MRR for the first time, in cents."
+        data_tests:
+          - not_null
+          - is_non_negative
+
+      - name: reactivation_mrr
+        data_type: int64
+        description: "MRR added by returning customers who had MRR at an earlier month end but none at the previous month end, in cents."
+        data_tests:
+          - not_null
+          - is_non_negative
+
+      - name: expansion_mrr
+        data_type: int64
+        description: "MRR added by customers who were already active and now pay more (more seats or a higher plan), in cents."
+        data_tests:
+          - not_null
+          - is_non_negative
+
+      - name: contraction_mrr
+        data_type: int64
+        description: "MRR lost by customers who remain active but now pay less, in cents. Reported as a positive number and subtracted in the bridge."
+        data_tests:
+          - not_null
+          - is_non_negative
+
+      - name: churned_mrr
+        data_type: int64
+        description: "MRR lost by customers who were active at the previous month end and have no MRR now, in cents. Reported as a positive number and subtracted in the bridge."
+        data_tests:
+          - not_null
+          - is_non_negative
+
+      - name: ending_mrr
+        data_type: int64
+        description: "Total MRR of all customers at the end of the month, in cents."
+        data_tests:
+          - not_null
+
+      - name: active_customers
+        data_type: int64
+        description: "Number of customers with MRR above 0 at the end of the month."
+        data_tests:
+          - not_null
+
+      - name: new_customers
+        data_type: int64
+        description: "Number of customers counted as new in the month (not reactivations)."
+        data_tests:
+          - not_null
+
+      - name: churned_customers
+        data_type: int64
+        description: "Number of customers who churned in the month: active at the previous month end, no MRR at this month end."
+        data_tests:
+          - not_null
