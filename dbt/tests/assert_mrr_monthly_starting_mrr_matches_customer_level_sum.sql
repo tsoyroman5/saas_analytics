@@ -8,14 +8,20 @@
 --
 -- The test passes when the query returns zero rows. Each returned row is a month where the two
 -- values differ, or where a month is missing on one side.
-with last_month_mrr_sum as (
-    select month, sum(last_month_mrr_cents) as last_month_mrr_cents_sum
+with customer_level as (
+    select
+        month,
+        sum(last_month_mrr_cents) as customer_level_starting_mrr
     from {{ ref('int_customer_mrr_movements') }}
     group by month
 )
 
-select 
-    lmms.month,
-from last_month_mrr_sum as lmms
-left join {{ ref('mrr_monthly') }} as mm on mm.month = lmms.month
-where lmms.last_month_mrr_cents_sum <> mm.starting_mrr
+select
+    coalesce(cl.month, mm.month) as month,
+    cl.customer_level_starting_mrr,
+    mm.starting_mrr,
+    mm.starting_mrr - cl.customer_level_starting_mrr as difference
+from customer_level as cl
+full outer join {{ ref('mrr_monthly') }} as mm
+    on cl.month = mm.month
+where cl.customer_level_starting_mrr is distinct from mm.starting_mrr
