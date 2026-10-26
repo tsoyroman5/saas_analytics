@@ -35,7 +35,6 @@ models:
         data_tests:
           - not_null
 
-
       - name: month
         data_type: date
         description: "First day of the calendar month. The MRR on this row is the month-end value."
@@ -52,7 +51,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: 
+                values:
                   [
                     "canceled",
                     "plan_changed",
@@ -68,7 +67,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['starter', 'pro', 'business']
+                values: ["starter", "pro", "business"]
 
       - name: seats
         data_type: int64
@@ -83,7 +82,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['monthly', 'annual']
+                values: ["monthly", "annual"]
 
       - name: price_per_seat_month_cents
         data_type: int64
@@ -115,6 +114,17 @@ models:
         description: "Kind of MRR movement in this month: new, reactivation, expansion, contraction, churn or nothing. Defined in the model description."
         data_tests:
           - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  [
+                    "new",
+                    "reactivation",
+                    "expansion",
+                    "contraction",
+                    "churn",
+                    "nothing",
+                  ]
 
       - name: max_history_amount_cents
         data_type: int64
