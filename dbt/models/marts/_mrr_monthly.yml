@@ -29,6 +29,7 @@ models:
         description: "First day of the calendar month. All figures describe the month-end state and the movements of that month."
         data_tests:
           - not_null
+          - unique
 
       - name: starting_mrr
         data_type: int64

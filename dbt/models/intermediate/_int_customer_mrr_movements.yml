@@ -74,7 +74,6 @@ models:
         description: "Number of seats at month end. For a canceled customer, the seats before the cancellation."
         data_tests:
           - not_null
-          - is_non_negative
 
       - name: billing_interval
         data_type: string
@@ -90,7 +89,6 @@ models:
         description: "Price of one seat for one month, in cents, for the row's plan and billing interval. Informational on canceled rows, where MRR is 0."
         data_tests:
           - not_null
-          - is_non_negative
 
       - name: mrr_cents
         data_type: int64

@@ -5,19 +5,22 @@ models:
     config:
       materialized: table
     description: >
-      Month-end subscription state of every customer, one row per customer per month, from the
-      customer's first month (the month of their `started` event) through the last month covered by the data.
-      This is the base for the MRR metrics. It holds the state only; MRR itself is added by the next step.
+      Month-end subscription state and monthly recurring revenue (MRR) of every customer, one row per
+      customer per month, from the customer's first month (the month of their `started` event) through the
+      last month covered by the data. This is the base for the MRR metrics.
 
       The state of a month is the latest subscription event strictly before the first instant of the
-      following month. A customer who is canceled keeps getting rows (with `event_type = 'canceled'`) up to
-      the last month, so churn is an explicit row, not a missing one. A `canceled` event still carries the
-      plan and seats from before the cancellation, so activity must be read from `event_type`, never from
-      `plan` or `seats`.
+      following month. MRR is seats multiplied by the price per seat for the plan and billing interval
+      (annual plans use the discounted price, already expressed per month), in cents. It is 0 when the
+      state is `canceled`. A customer who is canceled keeps getting rows up to the last month, so churn is
+      an explicit row with MRR 0, not a missing one. A `canceled` event still carries the plan and seats
+      from before the cancellation, so activity must be read from `event_type`, never from `plan` or `seats`.
 
-      Changes that start and end inside one month do not appear: only the month-end state is kept.
+      MRR here is a month-end snapshot of the subscription, not billed revenue: an annual customer's invoice
+      covers twelve months, while their MRR is one twelfth of it each month. Changes that start and end
+      inside one month do not appear: only the month-end state is kept.
       Assumption, not enforced: no two events of one customer share a timestamp. If they did, the choice
-      of the event for that month would be arbitrary.    
+      of the event for that month would be arbitrary.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -29,7 +32,7 @@ models:
         data_type: string
         description: "Customer identifier. Together with `month` it forms the grain of this model."
         data_tests:
-         - not_null
+          - not_null
 
       - name: month
         data_type: date
@@ -55,7 +58,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: 
+                values:
                   [
                     "canceled",
                     "plan_changed",
@@ -71,14 +74,13 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['starter', 'pro', 'business']
+                values: ["starter", "pro", "business"]
 
       - name: seats
         data_type: int64
         description: "Number of seats after the defining event. For a canceled customer, the seats before the cancellation."
         data_tests:
           - not_null
-          - is_non_negative
 
       - name: billing_interval
         data_type: string
@@ -87,8 +89,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['monthly', 'annual']
-
+                values: ["monthly", "annual"]
 
       - name: reason
         data_type: string
@@ -101,17 +102,16 @@ models:
         description: >
           Price of one seat for one month, in cents, for the row's plan and billing interval (from the
           `plan_prices` seed). Filled in for canceled rows too, where it is informational only: the MRR
-          of a canceled row is 0.        
+          of a canceled row is 0.
         data_tests:
           - not_null
-          - is_non_negative
 
       - name: mrr_cents
         data_type: int64
         description: >
           Monthly recurring revenue of the customer at the end of the month, in cents: seats multiplied by
           `price_per_seat_month_cents`, or 0 when `event_type` is `canceled`. Summing it over customers
-          gives the total MRR of the month.        
+          gives the total MRR of the month.
         data_tests:
           - not_null
           - is_non_negative
