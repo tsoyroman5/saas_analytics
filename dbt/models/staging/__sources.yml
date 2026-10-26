@@ -136,3 +136,65 @@ sources:
           - name: _batch_date
             data_type: date
             description: "Date of the daily batch that delivered the row."
+            
+      - name: truth_customer_month_mrr
+        description: >
+          Ground truth produced by the data generator (seed 42): the true month-end MRR of every customer
+          in every month in which it is above 0. Months with MRR 0 (before signup, or after cancellation)
+          are not listed. Used only by the reconciliation tests; it is not production data.
+        columns:
+          - name: month
+            data_type: string
+            description: "Calendar month as text in `YYYY-MM` format (not a date). Convert before comparing with model months."
+          - name: customer_id
+            data_type: string
+            description: "Customer identifier."
+          - name: mrr_cents
+            data_type: int64
+            description: "True MRR of the customer at the end of the month, in cents. Always above 0 in this table."
+
+      - name: truth_mrr_monthly
+        description: >
+          Ground truth produced by the data generator (seed 42): the true monthly MRR bridge, one row per
+          month. Computed by an independent replay of the generator's own state, not by the dbt models.
+          Used only by the reconciliation tests; it is not production data.
+        columns:
+          - name: month
+            data_type: string
+            description: "Calendar month as text in `YYYY-MM` format (not a date). Convert before comparing with model months."
+          - name: starting_mrr
+            data_type: int64
+            description: "Total MRR at the end of the previous month, in cents. 0 in the first month."
+          - name: new_mrr
+            data_type: int64
+            description: "MRR added by customers with month-end MRR for the first time, in cents."
+          - name: reactivation_mrr
+            data_type: int64
+            description: "MRR added by returning customers who had MRR at an earlier month end, in cents."
+          - name: expansion_mrr
+            data_type: int64
+            description: "MRR added by active customers who now pay more, in cents."
+          - name: contraction_mrr
+            data_type: int64
+            description: "MRR lost by customers who stay active but now pay less, in cents. Stored as a positive number."
+          - name: churned_mrr
+            data_type: int64
+            description: "MRR lost by customers who went from active to no MRR, in cents. Stored as a positive number."
+          - name: ending_mrr
+            data_type: int64
+            description: "Total MRR at the end of the month, in cents."
+          - name: active_customers
+            data_type: int64
+            description: "Number of customers with MRR above 0 at the end of the month."
+          - name: new_customers
+            data_type: int64
+            description: "Number of customers counted as new in the month (not reactivations)."
+          - name: churned_customers
+            data_type: int64
+            description: "Number of customers who churned in the month."
+          - name: nrr_monthly
+            data_type: float64
+            description: "Monthly net revenue retention: MRR now of last month's customers divided by their MRR last month. Empty in the first month, where there is no previous month."
+          - name: grr_monthly
+            data_type: float64
+            description: "Monthly gross revenue retention: like net retention, but each customer's MRR is capped at last month's value, so expansion is excluded. Empty in the first month."
