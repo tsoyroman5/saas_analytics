@@ -1,0 +1,134 @@
+version: 2
+
+models:
+  - name: int_customer_mrr_movements
+    config:
+      materialized: table
+    description: >
+      Month-over-month MRR movement of every customer, one row per customer per month, with the same
+      rows as `int_customer_month_mrr` (from each customer's first month through the last month in the data).
+      It compares each month's MRR with the previous month's and classifies the change, so that the
+      monthly bridge, retention and cohort models can aggregate it without repeating the logic.
+
+      Movement types, decided only from MRR and MRR history, never from event types:
+      `new` (previous MRR is 0, MRR is above 0, and the customer never had MRR at an earlier month end),
+      `reactivation` (the same, but the customer had MRR at some earlier month end),
+      `expansion` (MRR rose and was already above 0), `contraction` (MRR fell but is still above 0),
+      `churn` (previous MRR above 0, MRR is 0), and `nothing` (no change, including 0 to 0).
+      A customer who starts and cancels inside one month never has month-end MRR, so their later return
+      counts as `new`.
+
+      The amount is signed: positive for new, reactivation and expansion; negative for contraction and churn.
+      For every row, `last_month_mrr_cents + movement_amount_cents = mrr_cents`. The monthly bridge model
+      must flip the sign of contraction and churn to report them as positive numbers.
+      All amounts are in cents.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - customer_id
+              - month
+    columns:
+      - name: customer_id
+        data_type: string
+        description: "Customer identifier. Together with `month` it forms the grain of this model."
+        data_tests:
+          - not_null
+
+
+      - name: month
+        data_type: date
+        description: "First day of the calendar month. The MRR on this row is the month-end value."
+        data_tests:
+          - not_null
+
+      - name: event_type
+        data_type: string
+        description: >
+          Type of the subscription event that defines the customer's state at the end of this month
+          (started, plan_changed, seats_changed, canceled or reactivated). It describes the state, not the
+          movement: it keeps its value in months where nothing changed.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: 
+                  [
+                    "canceled",
+                    "plan_changed",
+                    "reactivated",
+                    "seats_changed",
+                    "started",
+                  ]
+
+      - name: plan
+        data_type: string
+        description: "Plan at month end. For a canceled customer, the last plan before the cancellation."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['starter', 'pro', 'business']
+
+      - name: seats
+        data_type: int64
+        description: "Number of seats at month end. For a canceled customer, the seats before the cancellation."
+        data_tests:
+          - not_null
+
+      - name: billing_interval
+        data_type: string
+        description: "Billing interval at month end (monthly or annual)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['monthly', 'annual']
+
+      - name: price_per_seat_month_cents
+        data_type: int64
+        description: "Price of one seat for one month, in cents, for the row's plan and billing interval. Informational on canceled rows, where MRR is 0."
+        data_tests:
+          - not_null
+
+      - name: mrr_cents
+        data_type: int64
+        description: "Monthly recurring revenue of the customer at the end of this month, in cents. 0 when the customer is canceled."
+        data_tests:
+          - not_null
+
+      - name: last_month_mrr_cents
+        data_type: int64
+        description: "MRR of the same customer at the end of the previous month, in cents. 0 for the customer's first month."
+        data_tests:
+          - not_null
+
+      - name: reason
+        data_type: string
+        description: >
+          Reason recorded on the defining event: `upgrade` or `downgrade` for a plan change, `voluntary` or
+          `payment_failed` for a cancellation. Empty for other event types. Used to split churn into voluntary
+          and involuntary.
+
+      - name: movement_type
+        data_type: string
+        description: "Kind of MRR movement in this month: new, reactivation, expansion, contraction, churn or nothing. Defined in the model description."
+        data_tests:
+          - not_null
+
+      - name: max_history_amount_cents
+        data_type: int64
+        description: >
+          Highest month-end MRR the customer had in any earlier month, in cents; 0 if there is no earlier month
+          or no earlier month with MRR. Above 0 means the customer was active before, which separates
+          `reactivation` from `new`.
+        data_tests:
+          - not_null
+
+      - name: movement_amount_cents
+        data_type: int64
+        description: >
+          Signed change in MRR caused by the movement, in cents: positive for new, reactivation and
+          expansion, negative for contraction and churn, 0 for nothing.
+        data_tests:
+          - not_null
