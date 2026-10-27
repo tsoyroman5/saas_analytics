@@ -1,0 +1,19 @@
+saas_analytics:
+  target: ci
+  outputs:
+    dev:
+      type: bigquery
+      threads: 8
+      database: saas-analytics-511706
+      schema: dbt_dev
+      method: oauth
+      location: asia-northeast3
+
+    ci:
+      type: bigquery
+      threads: 8
+      database: "{{ env_var('DBT_DATABASE') }}"
+      schema: "{{ env_var('DBT_SCHEMA') }}"
+      method: service-account
+      location: asia-northeast3
+      keyfile: "{{ env_var('DBT_KEYFILE') }}"
