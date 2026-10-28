@@ -16,7 +16,7 @@ jobs:
   dbt_build:
     name: dbt build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     env:
       DBT_DATABASE: saas-analytics-511706
@@ -38,7 +38,7 @@ jobs:
           printf '%s' "$KEY_JSON" > "$filepath"
           if ! [ -s "$filepath" ]; then
               echo "File is empty"
-              exit1
+              exit 1
           fi
           echo DBT_KEYFILE="$filepath" >> "$GITHUB_ENV"
       - name: Env verification
@@ -47,9 +47,24 @@ jobs:
           echo "$DBT_SCHEMA"
           if ! [ -s "$DBT_KEYFILE" ]; then
               echo "Key file is empty"
-              exit1
+              exit 1
           fi
           echo "$DBT_KEYFILE"
           ls -l "$DBT_KEYFILE"
       - run: dbt --version
-  
+      - name: Dependencies installation
+        working-directory: ./dbt
+        run: dbt deps
+      - name: Dbt build
+        working-directory: ./dbt
+        run: dbt build --target ci --profiles-dir ci
+      - name: gcloud auth
+        if: always()
+        run: gcloud auth activate-service-account --key-file "$DBT_KEYFILE"
+      - name: delete main dataset
+        if: always()
+        run: bq --project_id "$DBT_DATABASE" rm -r -f "${DBT_SCHEMA}"
+      - name: delete raw dataset
+        if: always()
+        run: bq --project_id "$DBT_DATABASE" rm -r -f "${DBT_SCHEMA}_raw"
+          
