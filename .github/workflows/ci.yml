@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    env:
+      DBT_DATABASE: saas-analytics-511706
+      DBT_SCHEMA: ${{ format('ci_pr_{0}', github.event.pull_request.number) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -25,5 +28,28 @@ jobs:
           python-version: '3.12.0'
       - run: python -m pip install -r requirements.txt
         working-directory: ./dbt
+      - name: Create key file
+        env:
+          KEY_JSON: ${{ secrets.CI_SERVICE_ACCOUNT }}
+        run: |
+          filepath="$RUNNER_TEMP/key.json"
+          umask 077
+          touch "$filepath"
+          printf '%s' "$KEY_JSON" > "$filepath"
+          if ! [ -s "$filepath" ]; then
+              echo "File is empty"
+              exit1
+          fi
+          echo DBT_KEYFILE="$filepath" >> "$GITHUB_ENV"
+      - name: Env verification
+        run: |
+          echo "$DBT_DATABASE"
+          echo "$DBT_SCHEMA"
+          if ! [ -s "$DBT_KEYFILE" ]; then
+              echo "Key file is empty"
+              exit1
+          fi
+          echo "$DBT_KEYFILE"
+          ls -l "$DBT_KEYFILE"
       - run: dbt --version
   
