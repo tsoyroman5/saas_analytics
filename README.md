@@ -10,8 +10,24 @@ A small analytics engineering project: raw subscription events go in, a tested m
 - A layered dbt project (staging, intermediate, marts) with documented models and 119 tests.
 - Reconciliation tests that compare the models with the true answers and fail when they disagree.
 - A GitHub Actions workflow that builds and tests the project on every pull request in a throwaway BigQuery dataset, and removes it afterwards, including when the build fails.
+- A one-page dashboard on top of the MRR bridge ([live report](https://datastudio.google.com/reporting/dd613ca5-e68f-4744-a918-9f65db5dc96f), screenshot below).
 
-**Stack:** BigQuery (`asia-northeast3`), dbt 2.x, Python (generator and loader), GitHub Actions.
+## Dashboard
+
+![MRR dashboard: scorecards, MRR movements by month, ending MRR, new vs churned customers](docs/metrics.png)
+
+[Open the live report](https://datastudio.google.com/reporting/dd613ca5-e68f-4744-a918-9f65db5dc96f) (Looker Studio, view only). It reads the `mrr_monthly` table directly; all figures are in currency units (cents divided by 100) and the data is synthetic.
+
+| Panel | What it shows |
+|---|---|
+| Scorecards (Sep 2026, change against Aug 2026) | ending MRR, net new MRR (ending minus starting), active customers, churned MRR |
+| MRR movements by month | stacked columns: new, reactivation and expansion above zero; contraction and churn below zero |
+| Ending MRR by month | the month-end MRR trend |
+| New vs churned customers by month | clustered columns on a single axis |
+
+Two details worth knowing: ending MRR and active customers are month-end snapshots, so the scorecards are fixed to a single month and never add values across months. The dashboard reads the development dataset (`dbt_dev`), not a separate production one; see the limitations below.
+
+**Stack:** BigQuery (`asia-northeast3`), dbt 2.x, Python (generator and loader), GitHub Actions, Looker Studio.
 
 ## Architecture
 
@@ -38,6 +54,7 @@ Other pieces: the seed `plan_prices` (price per seat per month in cents, by plan
 | `dbt/seeds/` | `plan_prices.csv` |
 | `dbt/ci/profiles.yml` | the CI profile: settings and `env_var(...)` only, no secrets |
 | `.github/workflows/ci.yml` | the pull request workflow |
+| `docs/metrics.png` | screenshot of the dashboard |
 | `docs/DESIGN.md` | the original design. Section 2 (metric definitions) is current; the model list and plan in sections 3 and 8 were simplified during the build |
 
 ## Metric definitions
@@ -104,6 +121,7 @@ Safeguards: minimal workflow permissions, one run at a time per pull request, a 
 - **Month-end snapshots** hide intra-month movements.
 - **Tie-breaking.** When two events of one customer have the same timestamp, the month-end model does not break the tie deterministically. This is a known, documented assumption. The reconciliation with ground truth shows that it has no effect on this dataset, but it is not enforced.
 - **Orphan product events** are warned about, not rejected (see above).
+- **The dashboard reads the development dataset.** There is no separate production target yet, so rebuilding `dbt_dev` locally changes what the dashboard shows. The live report is a free Looker Studio link and may not stay up, which is why the screenshot is part of this README.
 - **CI depends on persistent raw data.** The workflow reads `raw_saas` and the truth tables; it does not regenerate them.
 - **CI credentials.** The service account has project-wide BigQuery Data Editor so it can create and delete per-pull-request datasets. A production setup would restrict it further.
 - One currency, no taxes, discounts, proration, refunds or trials.
@@ -140,7 +158,7 @@ dbt build
 - Retention models: logo churn, gross and net revenue retention, trailing 12-month NRR, cohort retention.
 - An incremental `fct_product_events` model with a lookback window for late events.
 - A snapshot of customers, and dbt unit tests.
-- A dashboard on top of `mrr_monthly`.
+- A separate production target and dataset, so the dashboard no longer reads the development dataset, and retention panels on the dashboard once the retention models exist.
 
 ## How AI was used
 
